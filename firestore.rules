@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /listings/{listingId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /requests/{requestId} {
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.fromUid != request.resource.data.toUid
+        && request.resource.data.status == 'pending';
+      allow read: if request.auth != null && (
+        resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid
+      );
+      allow update: if request.auth != null
+        && resource.data.toUid == request.auth.uid
+        && request.resource.data.fromUid == resource.data.fromUid
+        && request.resource.data.toUid == resource.data.toUid
+        && request.resource.data.listingId == resource.data.listingId
+        && request.resource.data.status in ['accepted', 'declined'];
+      allow delete: if false;
+    }
+
+    match /messages/{messageId} {
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.requestId is string
+        && request.resource.data.toUid is string
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 1000;
+
+      allow read: if request.auth != null
+        && (
+          resource.data.fromUid == request.auth.uid
+          || resource.data.toUid == request.auth.uid
+        );
+
+      allow update, delete: if false;
+    }
+  }
+}
